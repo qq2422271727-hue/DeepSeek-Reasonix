@@ -42,6 +42,10 @@ jobs:
         working-directory: desktop
         run: npm ci
 
+      - name: Build desktop frontend (Vite)
+        working-directory: desktop
+        run: npx vite build
+
       - name: Download bundled Node runtime
         working-directory: desktop
         run: npm run bundle:node
@@ -53,17 +57,25 @@ jobs:
           $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
           $conf.bundle.createUpdaterArtifacts = $false
           $conf.plugins.updater.active = $false
+          # Remove beforeBuildCommand to avoid double-building frontend
+          $conf.build.beforeBuildCommand = ""
           $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
-          Write-Host "updater disabled"
+          Write-Host "updater disabled, beforeBuildCommand cleared"
 
       - name: Build Tauri bundle (unsigned)
         working-directory: desktop
         shell: pwsh
+        run: npx @tauri-apps/cli build --target x86_64-pc-windows-msvc --verbose
+
+      - name: List bundle output
+        shell: pwsh
         run: |
-          npx @tauri-apps/cli build --target x86_64-pc-windows-msvc --verbose 2>&1
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ""
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          Write-Host "=== MSI ==="
+          Get-ChildItem desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi -ErrorAction SilentlyContinue | Select-Object Name, @{N='MB';E={[math]::Round($_.Length/1MB,2)}}
+          Write-Host "=== NSIS ==="
+          Get-ChildItem desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -ErrorAction SilentlyContinue | Select-Object Name, @{N='MB';E={[math]::Round($_.Length/1MB,2)}}
+          Write-Host "=== EXE size ==="
+          Get-Item desktop/src-tauri/target/x86_64-pc-windows-msvc/release/reasonix-desktop.exe -ErrorAction SilentlyContinue | Select-Object Name, @{N='MB';E={[math]::Round($_.Length/1MB,2)}}
 
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
