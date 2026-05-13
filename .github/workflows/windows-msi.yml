@@ -25,7 +25,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
-          components: rustfmt, clippy
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -47,56 +46,31 @@ jobs:
         working-directory: desktop
         run: npm run bundle:node
 
-      - name: Check desktop dist exists
+      - name: Disable updater signing (no cert in personal build)
         working-directory: desktop
+        shell: pwsh
         run: |
-          echo "=== desktop/dist contents ==="
-          if (Test-Path dist) { Get-ChildItem dist -Recurse | Select-Object FullName } else { echo "dist/ NOT FOUND!" }
-          echo "=== root dist contents ==="
-          if (Test-Path ..\dist) { Get-ChildItem ..\dist | Select-Object FullName } else { echo "root dist/ NOT FOUND!" }
+          $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
+          $conf.bundle.createUpdaterArtifacts = $false
+          $conf.plugins.updater.active = $false
+          $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
+          Write-Host "updater disabled"
 
-      - name: Build Tauri app (verbose)
+      - name: Build Tauri bundle (unsigned)
         working-directory: desktop
+        shell: pwsh
+        run: |
+          npx @tauri-apps/cli build --target x86_64-pc-windows-msvc --verbose 2>&1
         env:
-          TAURI_PRIVATE_KEY: ""
-          TAURI_KEY_PASSWORD: ""
-          RUST_BACKTRACE: "1"
-          RUST_LOG: "debug"
-        run: |
-          echo "=== Starting tauri build ==="
-          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis --verbose 2>&1
-          echo "=== Tauri build exit code: $LASTEXITCODE ==="
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
-      - name: List build outputs
-        if: always()
-        working-directory: desktop
-        run: |
-          echo "=== target/release contents ==="
-          if (Test-Path src-tauri\target\x86_64-pc-windows-msvc\release) {
-            Get-ChildItem src-tauri\target\x86_64-pc-windows-msvc\release -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName, Length
-          } else { echo "target dir not found" }
-          echo "=== bundle contents ==="
-          if (Test-Path src-tauri\target\x86_64-pc-windows-msvc\release\bundle) {
-            Get-ChildItem src-tauri\target\x86_64-pc-windows-msvc\release\bundle -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName, Length
-          } else { echo "bundle dir not found" }
-
-      - name: Upload artifact
-        if: always()
+      - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
           name: reasonix-desktop-windows-x64
           path: |
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
             desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/*.exe
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: |
-            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/*.log
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
