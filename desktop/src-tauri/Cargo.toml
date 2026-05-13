@@ -20,6 +20,7 @@ anyhow = "1"
 which = "7"
 
 [features]
+default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
 [profile.release]

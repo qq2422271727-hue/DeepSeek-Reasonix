@@ -65,7 +65,7 @@ jobs:
       - name: Build Tauri bundle (unsigned)
         working-directory: desktop
         shell: pwsh
-        run: npx @tauri-apps/cli build --target x86_64-pc-windows-msvc --features custom-protocol --verbose
+        run: npx @tauri-apps/cli build --target x86_64-pc-windows-msvc --verbose
 
       - name: List bundle output
         shell: pwsh
