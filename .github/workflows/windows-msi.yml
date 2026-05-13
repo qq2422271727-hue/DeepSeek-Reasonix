@@ -1,9 +1,5 @@
 name: Build Windows MSI (personal)
 
-# 手动触发：在 Actions 页面点 Run workflow 即可。
-# 产物以 Artifact 形式附在这次 Run 的结果里，点 Summary 底部下载。
-# 不走 Release 流程，不需要打 tag。
-
 on:
   workflow_dispatch:
 
@@ -50,18 +46,20 @@ jobs:
         working-directory: desktop
         run: npm run bundle:node
 
-      - name: Build Tauri bundle (unsigned)
-        uses: tauri-apps/tauri-action@v0
-        with:
-          projectPath: desktop
-          args: --target x86_64-pc-windows-msvc
+      - name: Build Tauri app (unsigned, no updater)
+        working-directory: desktop
+        env:
+          TAURI_PRIVATE_KEY: ""
+          TAURI_KEY_PASSWORD: ""
+        run: |
+          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis 2>&1
 
-      - name: Upload MSI artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: reasonix-desktop-windows-x64
           path: |
-            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
             desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          if-no-files-found: error
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/*.exe
+          if-no-files-found: warn
           retention-days: 14
