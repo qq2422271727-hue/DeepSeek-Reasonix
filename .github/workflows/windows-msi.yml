@@ -42,10 +42,6 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      - name: Build desktop frontend (Vite)
-        working-directory: desktop
-        run: npx vite build
-
       - name: Download bundled Node runtime
         working-directory: desktop
         run: npm run bundle:node
@@ -54,13 +50,13 @@ jobs:
         working-directory: desktop
         shell: pwsh
         run: |
-          $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
           $conf.bundle.createUpdaterArtifacts = $false
           $conf.plugins.updater.active = $false
-          # Remove beforeBuildCommand to avoid double-building frontend
-          $conf.build.beforeBuildCommand = ""
-          $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json
-          Write-Host "updater disabled, beforeBuildCommand cleared"
+          $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json -Encoding UTF8
+          Write-Host "updater disabled, beforeBuildCommand kept intact"
+          Write-Host "frontendDist = $($conf.build.frontendDist)"
+          Write-Host "beforeBuildCommand = $($conf.build.beforeBuildCommand)"
 
       - name: Build Tauri bundle (unsigned)
         working-directory: desktop
