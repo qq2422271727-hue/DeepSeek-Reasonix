@@ -25,6 +25,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -46,20 +47,56 @@ jobs:
         working-directory: desktop
         run: npm run bundle:node
 
-      - name: Build Tauri app (unsigned, no updater)
+      - name: Check desktop dist exists
+        working-directory: desktop
+        run: |
+          echo "=== desktop/dist contents ==="
+          if (Test-Path dist) { Get-ChildItem dist -Recurse | Select-Object FullName } else { echo "dist/ NOT FOUND!" }
+          echo "=== root dist contents ==="
+          if (Test-Path ..\dist) { Get-ChildItem ..\dist | Select-Object FullName } else { echo "root dist/ NOT FOUND!" }
+
+      - name: Build Tauri app (verbose)
         working-directory: desktop
         env:
           TAURI_PRIVATE_KEY: ""
           TAURI_KEY_PASSWORD: ""
+          RUST_BACKTRACE: "1"
+          RUST_LOG: "debug"
         run: |
-          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis 2>&1
+          echo "=== Starting tauri build ==="
+          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis --verbose 2>&1
+          echo "=== Tauri build exit code: $LASTEXITCODE ==="
+
+      - name: List build outputs
+        if: always()
+        working-directory: desktop
+        run: |
+          echo "=== target/release contents ==="
+          if (Test-Path src-tauri\target\x86_64-pc-windows-msvc\release) {
+            Get-ChildItem src-tauri\target\x86_64-pc-windows-msvc\release -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName, Length
+          } else { echo "target dir not found" }
+          echo "=== bundle contents ==="
+          if (Test-Path src-tauri\target\x86_64-pc-windows-msvc\release\bundle) {
+            Get-ChildItem src-tauri\target\x86_64-pc-windows-msvc\release\bundle -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName, Length
+          } else { echo "bundle dir not found" }
 
       - name: Upload artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reasonix-desktop-windows-x64
           path: |
             desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
             desktop/src-tauri/target/x86_64-pc-windows-msvc/release/*.exe
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            desktop/src-tauri/target/x86_64-pc-windows-msvc/release/*.log
           if-no-files-found: warn
           retention-days: 14
